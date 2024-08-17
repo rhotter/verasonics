@@ -24,8 +24,8 @@
 
 clear all
 
-P.startDepth = 12;
-P.endDepth = 128;   % Acquisition depth in wavelengths
+P.startDepth = 2;
+P.endDepth = 70;   % Acquisition depth in wavelengths
 
 % Define system parameters.
 Resource.Parameters.numTransmit = 128;  % number of transmit channels.
@@ -43,7 +43,7 @@ Resource.System.UTA = '260-M';  % this line was added
 
 % Specify Trans structure array.
 Trans.name = 'P4-1';
-Trans.frequency = 1;
+Trans.frequency = 2.5;
 Trans.units = 'wavelengths'; % Explicit declaration avoids warning message when selected by default
 % Trans.HVMux.utaSF = 2;
 Trans = computeTrans(Trans);
@@ -51,7 +51,8 @@ Trans = computeUTAMux64(Trans);  % this line was added
 
 % Set apodization (this line was added)
 apod = ones(1,Trans.numelements); 
-apod(65:end) = 0;
+% used to be apod(49:end) = 0;
+apod(49:end) = 0;
 
 apernum = computeMuxAperture(apod, Trans); % this line was added
 
@@ -110,12 +111,13 @@ PData(1).Region = computeRegions(PData(1));
 % Media.function = 'movePoints';
 
 % Specify Resources.
+num_frames_per_row = 1;
 Resource.RcvBuffer(1).datatype = 'int16';
-Resource.RcvBuffer(1).rowsPerFrame = 4096;
+Resource.RcvBuffer(1).rowsPerFrame = 1024 * num_frames_per_row;
 Resource.RcvBuffer(1).colsPerFrame = Resource.Parameters.numRcvChannels;
-Resource.RcvBuffer(1).numFrames = 100;    % 100 frames used for RF cineloop.
+Resource.RcvBuffer(1).numFrames = 8000 / num_frames_per_row;    % 100 frames used for RF cineloop.
 Resource.InterBuffer(1).numFrames = 1;  % one intermediate buffer defined but not used.
-Resource.ImageBuffer(1).numFrames = 10;
+Resource.ImageBuffer(1).numFrames = 1;
 Resource.DisplayWindow(1).Title = 'P4-1Flash';
 Resource.DisplayWindow(1).pdelta = 0.35;
 ScrnSize = get(0,'ScreenSize');
@@ -125,7 +127,7 @@ Resource.DisplayWindow(1).Position = [250,(ScrnSize(4)-(DwHeight+150))/2, ...  %
                                       DwWidth, DwHeight];
 Resource.DisplayWindow(1).ReferencePt = [PData(1).Origin(1),0,PData(1).Origin(3)];   % 2D imaging is in the X,Z plane
 Resource.DisplayWindow(1).Type = 'Verasonics';
-Resource.DisplayWindow(1).numFrames = 20;
+Resource.DisplayWindow(1).numFrames = 1;
 Resource.DisplayWindow(1).AxesUnits = 'mm';
 Resource.DisplayWindow.Colormap = gray(256);
 
@@ -136,7 +138,7 @@ TW.Parameters = [Trans.frequency,.67,2,1];
 % Set up transmit delays in TX structure.
 TX.waveform = 1;
 TX.Origin = [0,0,0];            % set origin to 0,0,0 for flat focus.
-TX.focus = 100*P.radius;     % set focus to negative for concave TX.Delay profile.
+TX.focus = 0;%100*P.radius;     % set focus to negative for concave TX.Delay profile.
 TX.Steer = [0,0];
 TX.Apod = apod;  % set TX.Apod for 96 elements  % this line was added
 TX.Delay = computeTXDelays(TX);
@@ -206,7 +208,7 @@ Process(1).Parameters = {'imgbufnum',1,...   % number of buffer to process.
 SeqControl(1).command = 'jump'; %  - Jump back to start.
 SeqControl(1).argument = 1;
 SeqControl(2).command = 'timeToNextAcq';  % set time between frames
-SeqControl(2).argument = 10000; % 10msec (~100fps)
+SeqControl(2).argument = 300; % 10msec (~100fps)
 SeqControl(3).command = 'returnToMatlab';
 nsc = 4; % nsc is count of SeqControl objects
 
@@ -224,17 +226,18 @@ for i = 1:Resource.RcvBuffer(1).numFrames
        nsc = nsc + 1;
     n = n+1;
 
-    Event(n).info = 'Reconstruct';
-    Event(n).tx = 0;
-    Event(n).rcv = 0;
-    Event(n).recon = 1;
-    Event(n).process = 1;
-    Event(n).seqControl = 0;
-    if floor(i/3) == i/3     % Exit to Matlab every 3rd frame
-        Event(n).seqControl = 3;
-    end
-    n = n+1;
 end
+
+Event(n).info = 'Reconstruct';
+Event(n).tx = 0;
+Event(n).rcv = 0;
+Event(n).recon = 1;
+Event(n).process = 1;
+Event(n).seqControl = 0;
+if true    % Exit to Matlab every 3rd frame
+    Event(n).seqControl = 3;
+end
+n = n+1;
 
 Event(n).info = 'Jump back to first event';
 Event(n).tx = 0;
@@ -265,7 +268,7 @@ UI(2).Control = {'UserA1','Style','VsSlider','Label',['Range (',AxesUnit,')'],..
 UI(2).Callback = text2cell('%RangeChangeCallback');
 
 % Specify factor for converting sequenceRate to frameRate.
-frameRateFactor = 3;
+frameRateFactor = 1;
 
 % Save all the structures to a .mat file.
 save('MatFiles/P4-1Flash');

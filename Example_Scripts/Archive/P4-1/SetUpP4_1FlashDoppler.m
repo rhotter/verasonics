@@ -59,7 +59,7 @@ Trans.maxHighVoltage = 50;  % set maximum high voltage limit for pulser supply.
 
 % Set apodization (this line was added)
 apod = ones(1,Trans.numelements); 
-apod(65:end) = 0;
+apod(49:end) = 0;
 
 apernum = computeMuxAperture(apod, Trans); % this line was added
 
@@ -138,7 +138,7 @@ PData(2).Region = computeRegions(PData(2));
 Resource.RcvBuffer(1).datatype = 'int16';
 Resource.RcvBuffer(1).rowsPerFrame = 2048*(na + ne);
 Resource.RcvBuffer(1).colsPerFrame = Resource.Parameters.numRcvChannels;
-Resource.RcvBuffer(1).numFrames = 10;     % 10 frames allocated for RF acqusitions.
+Resource.RcvBuffer(1).numFrames = 600;     % 10 frames allocated for RF acqusitions.
 % InterBuffer(1) is for 2D reconstructions.
 Resource.InterBuffer(1).numFrames = 1;  % one intermediate buffer needed.
 % InterBuffer(2) is for Doppler reconstructions.
@@ -359,7 +359,7 @@ Process(3).Parameters = {'imgbufnum',2,...   % number of buffer to process.
 % Specify SeqControl structure arrays.
 % -- Time between 2D flash angle acquisitions
 SeqControl(1).command = 'timeToNextAcq';
-SeqControl(1).argument = 200;
+SeqControl(1).argument = 50;
 % -- Change to Profile 2 (Doppler)
 SeqControl(2).command = 'setTPCProfile';
 SeqControl(2).condition = 'next';

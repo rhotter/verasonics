@@ -26,9 +26,9 @@ clear all
 P.startDepth = 0;
 P.endDepth = 160;   % Acquisition depth in wavelengths
 
-na = 11;      % Number of angles
+na = 5;      % Number of angles
 if na > 1
-    dtheta = (60*pi/180)/(na-1); startAngle = -60*pi/180/2;  % set dtheta to range over +/- 30 degrees.
+    dtheta = (16*pi/180)/(na-1); startAngle = -16*pi/180/2;  % set dtheta to range over +/- 30 degrees.
 else
     dtheta = 0; startAngle = 0;
 end
@@ -47,13 +47,14 @@ Resource.Parameters.simulateMode = 0;
 % Specify Trans structure array.
 Trans.name = 'P4-1';
 Trans.units = 'wavelengths'; % Explicit declaration avoids warning message when selected by default
+Trans.frequency = 2.5;
 Trans = computeTrans(Trans);
 Trans.maxHighVoltage = 50;  % set maximum high voltage limit for pulser supply.
 Trans = computeUTAMux64(Trans);  % this line was added
 
 % Set apodization (this line was added)
 apod = ones(1,Trans.numelements); 
-apod(65:end) = 0;
+apod(49:Trans.numelements) = 0;
 
 apernum = computeMuxAperture(apod, Trans); % this line was added
 
@@ -112,9 +113,9 @@ PData(1).Region = computeRegions(PData(1));
 Resource.RcvBuffer(1).datatype = 'int16';
 Resource.RcvBuffer(1).rowsPerFrame = na*4096;
 Resource.RcvBuffer(1).colsPerFrame = Resource.Parameters.numRcvChannels;
-Resource.RcvBuffer(1).numFrames = 30;     % 30 frames used for RF cineloop.
+Resource.RcvBuffer(1).numFrames = 1000;     % 2000 frames used for RF cineloop.
 Resource.InterBuffer(1).numFrames = 1;    % one intermediate buffer defined but not used.
-Resource.ImageBuffer(1).numFrames = 10;
+Resource.ImageBuffer(1).numFrames = 1;
 Resource.DisplayWindow(1).Title = 'P4-1FlashAngles';
 Resource.DisplayWindow(1).pdelta = 0.35;
 ScrnSize = get(0,'ScreenSize');
@@ -124,7 +125,7 @@ Resource.DisplayWindow(1).Position = [250,(ScrnSize(4)-(DwHeight+150))/2, ...  %
                                       DwWidth, DwHeight];
 Resource.DisplayWindow(1).ReferencePt = [PData(1).Origin(1),0,PData(1).Origin(3)];   % 2D imaging is in the X,Z plane
 Resource.DisplayWindow(1).Type = 'Verasonics';
-Resource.DisplayWindow(1).numFrames = 20;
+Resource.DisplayWindow(1).numFrames = 1;
 Resource.DisplayWindow(1).AxesUnits = 'mm';
 Resource.DisplayWindow.Colormap = gray(256);
 
@@ -137,7 +138,7 @@ TW.Parameters = [Trans.frequency,.67,2,1];
 % Specify TX structure array.
 TX = repmat(struct('waveform', 1, ...
                    'Origin', [0.0,0.0,0.0], ...
-                   'focus', 100*P.radius, ... % this line was added
+                   'focus', 0.0, ... % this line was added
                    'Steer', [0.0,0.0], ...
                    'Apod', apod, ...  % set TX.Apod for 96 elements % this line was added
                    'aperture', 1, ...  % this line was added
@@ -228,9 +229,9 @@ Process(1).Parameters = {'imgbufnum',1,...   % number of buffer to process.
 SeqControl(1).command = 'jump'; % jump back to start
 SeqControl(1).argument = 1;
 SeqControl(2).command = 'timeToNextAcq';  % time between each transmit
-SeqControl(2).argument = 400;  % 400 us
+SeqControl(2).argument = 300;  % 50 us
 SeqControl(3).command = 'timeToNextAcq';  % time between frames
-SeqControl(3).argument = 20000 - (na-1)*400;  % 20 msec
+SeqControl(3).argument = 20000 - na*SeqControl(2).argument;  % 1 msec
 SeqControl(4).command = 'returnToMatlab';
 nsc = 5;
 
@@ -247,20 +248,18 @@ for i = 1:Resource.RcvBuffer(1).numFrames
         n = n+1;
     end
     Event(n-1).seqControl = [3,nsc]; % modify last event's seqCntrl: time between frames & transferToHostuse
-       SeqControl(nsc).command = 'transferToHost';
-       nsc = nsc + 1;
-
-    Event(n).info = 'recon and process';
-    Event(n).tx = 0;
-    Event(n).rcv = 0;
-    Event(n).recon = 1;
-    Event(n).process = 1;
-    Event(n).seqControl = 0;
-    if floor(i/3) == i/3     % Exit to Matlab every 3rd frame
-        Event(n).seqControl = 4;
-    end
-    n = n+1;
+    SeqControl(nsc).command = 'transferToHost';
+    nsc = nsc + 1;
 end
+
+Event(n).info = 'recon and process';
+Event(n).tx = 0;
+Event(n).rcv = 0;
+Event(n).recon = 1;
+Event(n).process = 1;
+Event(n).seqControl = 0;
+Event(n).seqControl = 4;
+n = n+1;
 
 Event(n).info = 'Jump back';
 Event(n).tx = 0;
@@ -291,7 +290,7 @@ UI(2).Control = {'UserA1','Style','VsSlider','Label',['Range (',AxesUnit,')'],..
 UI(2).Callback = text2cell('%RangeChangeCallback');
 
 % Specify factor for converting sequenceRate to frameRate.
-frameRateFactor = 3;
+frameRateFactor = Resource.RcvBuffer(1).numFrames;
 
 % Save all the structures to a .mat file.
 save('MatFiles/P4-1FlashAngles');
