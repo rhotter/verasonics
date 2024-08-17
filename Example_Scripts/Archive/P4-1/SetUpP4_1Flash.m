@@ -43,7 +43,7 @@ Resource.System.UTA = '260-M';  % this line was added
 
 % Specify Trans structure array.
 Trans.name = 'P4-1';
-Trans.frequency = 1;
+Trans.frequency = 2.5;
 Trans.units = 'wavelengths'; % Explicit declaration avoids warning message when selected by default
 % Trans.HVMux.utaSF = 2;
 Trans = computeTrans(Trans);
@@ -51,7 +51,7 @@ Trans = computeUTAMux64(Trans);  % this line was added
 
 % Set apodization (this line was added)
 apod = ones(1,Trans.numelements); 
-apod(65:end) = 0;
+apod(49:end) = 0;
 
 apernum = computeMuxAperture(apod, Trans); % this line was added
 
@@ -136,7 +136,7 @@ TW.Parameters = [Trans.frequency,.67,2,1];
 % Set up transmit delays in TX structure.
 TX.waveform = 1;
 TX.Origin = [0,0,0];            % set origin to 0,0,0 for flat focus.
-TX.focus = 100*P.radius;     % set focus to negative for concave TX.Delay profile.
+TX.focus = 0;     % set focus to negative for concave TX.Delay profile.
 TX.Steer = [0,0];
 TX.Apod = apod;  % set TX.Apod for 96 elements  % this line was added
 TX.Delay = computeTXDelays(TX);
