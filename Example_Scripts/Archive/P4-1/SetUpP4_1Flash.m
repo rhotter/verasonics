@@ -208,7 +208,8 @@ SeqControl(1).argument = 1;
 SeqControl(2).command = 'timeToNextAcq';  % set time between frames
 SeqControl(2).argument = 10000; % 10msec (~100fps)
 SeqControl(3).command = 'returnToMatlab';
-nsc = 4; % nsc is count of SeqControl objects
+SeqControl(4).command = 'triggerOut';
+nsc = 5; % nsc is count of SeqControl objects
 
 n = 1; % n is count of Events
 
@@ -219,9 +220,9 @@ for i = 1:Resource.RcvBuffer(1).numFrames
     Event(n).rcv = i;
     Event(n).recon = 0;
     Event(n).process = 0;
-    Event(n).seqControl = [2,nsc];
-       SeqControl(nsc).command = 'transferToHost';
-       nsc = nsc + 1;
+    Event(n).seqControl = [4,2,nsc];
+    SeqControl(nsc).command = 'transferToHost';
+    nsc = nsc + 1;
     n = n+1;
 
     Event(n).info = 'Reconstruct';
