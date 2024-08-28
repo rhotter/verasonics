@@ -22,9 +22,13 @@
 % Last update:
 % 12/13/2015 - modified for SW 3.0
 
+
+
 clear all
 
-P.startDepth = 12;
+import vsv.seq.uicontrol.VsSliderControl 
+
+P.startDepth = 50;
 P.endDepth = 128;   % Acquisition depth in wavelengths
 
 % Define system parameters.
@@ -78,37 +82,6 @@ PData(1).Region = struct(...
             'steer',0));
 PData(1).Region = computeRegions(PData(1));
 
-% Specify Media.  Use point targets in middle of PData(1).
-% Set up Media points
-% - Uncomment for speckle
-% Media.MP = rand(40000,4);
-% Media.MP(:,2) = 0;
-% Media.MP(:,4) = 0.04*Media.MP(:,4) + 0.04;  % Random amplitude
-% Media.MP(:,1) = 2*halfwidth*(Media.MP(:,1)-0.5);
-% Media.MP(:,3) = P.acqDepth*Media.MP(:,3);
-% Media.MP(1,:) = [-45,0,30,1.0];
-% Media.MP(2,:) = [-15,0,30,1.0];
-% Media.MP(3,:) = [15,0,30,1.0];
-% Media.MP(4,:) = [45,0,30,1.0];
-% Media.MP(5,:) = [-15,0,60,1.0];
-% Media.MP(6,:) = [-15,0,90,1.0];
-% Media.MP(7,:) = [-15,0,120,1.0];
-% Media.MP(8,:) = [-15,0,150,1.0];
-% Media.MP(9,:) = [-45,0,120,1.0];
-% Media.MP(10,:) = [15,0,120,1.0];
-% Media.MP(11,:) = [45,0,120,1.0];
-% Media.MP(12,:) = [-10,0,69,1.0];
-% Media.MP(13,:) = [-5,0,75,1.0];
-% Media.MP(14,:) = [0,0,78,1.0];
-% Media.MP(15,:) = [5,0,80,1.0];
-% Media.MP(16,:) = [10,0,81,1.0];
-% Media.MP(17,:) = [-75,0,120,1.0];
-% Media.MP(18,:) = [75,0,120,1.0];
-% Media.MP(19,:) = [-15,0,180,1.0];
-% Media.numPoints = 19;
-% Media.attenuation = -0.5;
-% Media.function = 'movePoints';
-
 % Specify Resources.
 Resource.RcvBuffer(1).datatype = 'int16';
 Resource.RcvBuffer(1).rowsPerFrame = 4096;
@@ -131,7 +104,8 @@ Resource.DisplayWindow.Colormap = gray(256);
 
 % Specify Transmit waveform structure.
 TW.type = 'parametric';
-TW.Parameters = [Trans.frequency,.67,2,1];
+ncycles = 4;
+TW.Parameters = [Trans.frequency,.67,ncycles,1];
 
 % Set up transmit delays in TX structure.
 TX.waveform = 1;
@@ -145,7 +119,7 @@ TX.aperture = 1;  % this line was added
 % Specify Receive structure arrays.
 maxAcqLength = ceil(sqrt(P.aperture^2 + P.endDepth^2 - 2*P.aperture*P.endDepth*cos(P.theta-pi/2)) - P.startDepth);
 wlsPer128 = 128/(4*2); % wavelengths in 128 samples for 4 samplesPerWave
-Receive = repmat(struct('Apod', apod, ... % this line was added
+Receive = repmat(struct('Apod', zeros(1, length(apod)), ...
                         'startDepth', P.startDepth, ...
                         'endDepth', P.startDepth + wlsPer128*ceil(maxAcqLength/wlsPer128), ...
                         'TGC', 1, ...
@@ -206,7 +180,7 @@ Process(1).Parameters = {'imgbufnum',1,...   % number of buffer to process.
 SeqControl(1).command = 'jump'; %  - Jump back to start.
 SeqControl(1).argument = 1;
 SeqControl(2).command = 'timeToNextAcq';  % set time between frames
-SeqControl(2).argument = 10000; % 10msec (~100fps)
+SeqControl(2).argument = 100000; % 10msec (~100fps)
 SeqControl(3).command = 'returnToMatlab';
 SeqControl(4).command = 'triggerOut';
 nsc = 5; % nsc is count of SeqControl objects
@@ -264,6 +238,25 @@ end
 UI(2).Control = {'UserA1','Style','VsSlider','Label',['Range (',AxesUnit,')'],...
                  'SliderMinMaxVal',MinMaxVal,'SliderStep',[0.1,0.2],'ValueFormat','%3.0f'};
 UI(2).Callback = text2cell('%RangeChangeCallback');
+
+% control frequency
+UI(3).Control = VsSliderControl('LocationCode','UserB1',...
+    'Label','Frequency',...
+    'SliderMinMaxVal',[0.5,4.5,2.5],...
+   'SliderStep', [0.125,0.125],...
+   'ValueFormat', '%0.1f'); 
+
+UI(3).Callback = @frequencyCallback;
+
+% Number of pulses
+UI(4).Control = VsSliderControl('LocationCode','UserB2',...
+    'Label','Pulse width',...
+    'SliderMinMaxVal',[2,10000,2],...
+   'SliderStep', [0.01,0.01],...
+   'ValueFormat', '%0.0f');
+
+UI(4).Callback = @pulseNumCallback;
+
 
 % Specify factor for converting sequenceRate to frameRate.
 frameRateFactor = 3;
@@ -336,3 +329,33 @@ assignin('base','Control', Control);
 assignin('base', 'action', 'displayChange');
 return
 %RangeChangeCallback
+
+% frequency callback
+function frequencyCallback(~,~,UIValue)
+    % Trans = evalin('base','Trans');
+    % Trans.frequency = UIValue;
+    % Trans = computeTrans(Trans);
+    % assignin('base','Trans',Trans);
+
+    TW = evalin('base','TW');
+    TW.Parameters(1) = UIValue;
+    assignin('base','TW',TW);
+
+    Control = evalin('base','Control');
+    Control.Command = 'update&Run';
+    Control.Parameters = {'TW'};
+    assignin('base','Control', Control);
+    return
+end
+
+function pulseNumCallback(~,~,UIValue)
+    TW = evalin('base','TW');
+    TW.Parameters(3) = UIValue;
+    assignin('base','TW',TW);
+
+    Control = evalin('base','Control');
+    Control.Command = 'update&Run';
+    Control.Parameters = {'TW'};
+    assignin('base','Control', Control);
+    return
+end
